@@ -1,4 +1,4 @@
-% snake.pl -- A snake-in-the-box solver
+% snakes.pl -- A snake-in-the-box solver
 % Copyright (C) 2014  Chris Barrick <cbarrick1@gmail.com>
 %
 % Permission to use, copy, modify, and/or distribute this software for any
@@ -267,7 +267,12 @@ merge([X|XT], [Y|YT], Comp, Merged) :-
 
 %% comparator(+Evaluator, -Comparator)
 %% comparator_inverse(+Evaluator, -Comparator)
-%
+% Given an Evaluator predicate, generate a Comparator predicate for use with
+% the sorting algorithms. The Evaluator should be callable with two additional
+% arguments; the first is the element being evaluated, and the second is a
+% variable which should become bound to a numeric value. `comparator` generates
+% a comparator for ascending order and `comparator_inverse` generates a
+% comparator for descending order.
 
 % Both predicates memo their results to avoid asserting too many rules
 :- dynamic(comparator_memo/2).
@@ -337,14 +342,14 @@ long_snake_naive(Dimension, Snake) :-
 	% Try to find any snake of this length
 	length(Snake, SnakeLength),
 	once(snake(Dimension, Snake)),
-	format('  found length ~w: ~w\n', [SnakeLength, Snake]),
+	format('found length ~w: ~w\n', [SnakeLength, Snake]),
 
 	% There must not be any snakes longer than this snake
 	NextLength is SnakeLength + 1,
 	length(NextSnake, NextLength),
 	\+ snake(Dimension, NextSnake),
-	format('  did not find length ~w\n', [NextLength]),
-	format('  longest snake: ~w\n', [Snake]),
+	format('did not find length ~w\n', [NextLength]),
+	format('longest snake: ~w\n', [Snake]),
 	!.
 
 
@@ -352,7 +357,9 @@ long_snake_naive(Dimension, Snake) :-
 % --------------------------------------------------
 
 %% ga_offspring(+Mother, +Father, ?Child)
-%
+% True when Child is an offspring of Mother and Father. That is, at some
+% crossover point, every element before that point in Child is from Mother,
+% and every element after that point if from Father.
 
 ga_offspring(Mother, Father, Child) :-
 	length(Mother, L),
@@ -372,8 +379,8 @@ ga_offspring_([MH|MT], [FH|FT], [CH|CT], Crossover) :-
 	ga_offspring_(MT, FT, CT, NextCrossover).
 
 
-%% ga_breed_population(...)
-%
+%% ga_breed_population(+Parents, -Population)
+% Given a list of parents, generates a Population of all possible offspring.
 
 ga_breed_population(Parents, Population) :-
 	length(Parents, L),
@@ -387,7 +394,10 @@ ga_breed_population(Parents, Population) :-
 
 
 %% ga_random_path(+Dimension, -Transitions)
-%
+% Generate a random transition list for a path in the hypercube of the given
+% Dimension. The transition list will have a length of
+% ceiling(0.4 * 2 ^ Dimension), which is long enough to represent the longest
+% snake.
 
 ga_random_path(Dimension, Transitions) :-
 
@@ -407,8 +417,11 @@ ga_random_path_(Dimension, Transitions) :-
 	ga_random_path_(Dimension, T).
 
 
-%% ga_random_population(...)
-%
+%% ga_random_population(+Dimension, +Size, -Population)
+% Generate a Population of random transition lists for paths in the hypercube
+% of the given Dimension. Each transition list will have a length of
+% ceiling(0.4 * 2 ^ Dimension), which is long enough to represent the longest
+% snake.
 
 ga_random_population(_, 0, []) :- !.
 
@@ -419,8 +432,9 @@ ga_random_population(Dimension, Size, Population) :-
 	ga_random_population(Dimension, S0, T).
 
 
-%% ga_fitness(...)
-%
+%% ga_fitness(+Dimension, +Transitions, -Fitness)
+% Calculate the Fitness score for a list of Transitions describing a path
+% in the hypercube of the given Dimension.
 
 ga_fitness(Dimension, Transitions, Fitness) :-
 	transition_list(Path, Transitions),
@@ -431,11 +445,16 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 	Fitness is (Dimension * X) + Y.
 
 
-%% long_snake_ga(...)
-%
+%% long_snake_ga(+Dimension, -Snake)
+% Find a long snake using a ginetic algorithm. Runs for 500 generations.
 
 long_snake_ga(Dimension, Snake) :-
 	long_snake_ga(Dimension, -500, Snake).
+
+
+%% long_snake_ga(+Dimension, +N, -Snake)
+% Find a long snake using a ginetic algorithm. If N is negative, runs for that
+% many generations. If N = 1, run indefinitly.
 
 long_snake_ga(Dimension, N, Snake) :-
 	format('long_snake_ga: genetic algorithm search\n', []),
@@ -453,11 +472,12 @@ long_snake_ga_(Dimension, Population, 0, Best) :-
 	ga_fitness(Dimension, BestTransitions, BestFitness),
 	length(Population, PopSize),
 	length(Best, BestLength),
-	format('  generation 0:\n', []),
-	format('    population size = ~w\n', [PopSize]),
-	format('    best snake = ~w\n', [Best]),
-	format('    length (nodes) = ~w\n', [BestLength]),
-	format('    fitness = ~w\n', [BestFitness]),
+	format('generation 0:\n', []),
+	format('  population size = ~w\n', [PopSize]),
+	format('  best snake = ~w\n', [Best]),
+	format('  length (nodes) = ~w\n', [BestLength]),
+	format('  fitness = ~w\n', [BestFitness]),
+	format('DONE\n'),
 	!.
 
 long_snake_ga_(Dimension, Population, Generation, Best) :-
@@ -470,11 +490,11 @@ long_snake_ga_(Dimension, Population, Generation, Best) :-
 	ga_fitness(Dimension, A, BestFitness),
 	length(Population, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
-	format('  generation ~w:\n', [Generation]),
-	format('    population size = ~w\n', [PopSize]),
-	format('    best snake = ~w\n', [CurrentBestSnake]),
-	format('    length (nodes) = ~w\n', [CurrentBestLength]),
-	format('    fitness = ~w\n', [BestFitness]),
+	format('generation ~w:\n', [Generation]),
+	format('  population size = ~w\n', [PopSize]),
+	format('  best snake = ~w\n', [CurrentBestSnake]),
+	format('  length (nodes) = ~w\n', [CurrentBestLength]),
+	format('  fitness = ~w\n', [BestFitness]),
 
 	ga_random_path(Dimension, Random1),
 	ga_random_path(Dimension, Random2),
@@ -522,5 +542,6 @@ sorting_test :-
 
 
 % Find the longest snake in 7D using the GA
+% This will run indefinitly, printing results after each generation
 main :-
 	long_snake_ga(7, 1, _).
