@@ -265,63 +265,48 @@ merge([X|XT], [Y|YT], Comp, Merged) :-
 	merge([X|XT], YT, Comp, Rest).
 
 
-%% comparator(+Evaluator, -Comparator)
-%% comparator_inverse(+Evaluator, -Comparator)
-% Given an Evaluator predicate, generate a Comparator predicate for use with
-% the sorting algorithms. The Evaluator should be callable with two additional
-% arguments; the first is the element being evaluated, and the second is a
-% variable which should become bound to a numeric value. `comparator` generates
-% a comparator for ascending order and `comparator_inverse` generates a
-% comparator for descending order.
+%% ascending(+A, +B, -C), ascending(+Evaluator, +A, +B, -C)
+%% descending(+A, +B, -C), descending(+Evaluator, +A, +B, -C)
+% Given an Evaluator predicate, bind C to either A or B. The Evaluator is
+% called with two additional arguments; the first is the item being evaluated,
+% and the second is a variable which should become bound to a numeric value
+% for the item. `ascending` binds C to the item with the smallest value, and
+% `descending` binds C to the item with the largest value.
 
-% Both predicates memo their results to avoid asserting too many rules
-:- dynamic(comparator_memo/2).
-:- dynamic(comparator_inverse_memo/2).
+ascending(A, B, C) :-
+	A < B,
+	C = A.
 
-% Creates a comparator that orders items from smallest to biggest
-comparator(Eval, Comp) :-
-	comparator_memo(Eval, Comp),
-	!.
+ascending(A, B, C) :-
+	A >= B,
+	C = B.
 
-comparator(Eval, Comp) :-
-	gensym(comparator, Comp),
-	Head =.. [Comp, A, B, C],
-	Rule = (
-		Head :-
-			call(Eval, A, ValueA),
-			call(Eval, B, ValueB),
-			( ValueA < ValueB ->
-				C = A
-			;
-				C = B
-			),
-			!
+ascending(Eval, A, B, C) :-
+	call(Eval, A, ValueA),
+	call(Eval, B, ValueB),
+	( ValueA < ValueB ->
+		C = A
+	;
+		C = B
 	),
-	asserta(Rule),
-	asserta(comparator_memo(Eval, Comp)),
 	!.
 
-% Creates a comparator that orders item from biggest to smallest
-comparator_inverse(Eval, Comp) :-
-	comparator_inverse_memo(Eval, Comp),
-	!.
+descending(A, B, C) :-
+	A > B,
+	C = A.
 
-comparator_inverse(Eval, Comp) :-
-	gensym(comparator, Comp),
-	Head =.. [Comp, A, B, C],
-	Rule = (
-		Head :-
-			call(Eval, A, ValueA),
-			call(Eval, B, ValueB),
-			( ValueA > ValueB ->
-				C = A
-			;
-				C = B
-			),
-			!
+descending(A, B, C) :-
+	A =< B,
+	C = B.
+
+descending(Eval, A, B, C) :-
+	call(Eval, A, ValueA),
+	call(Eval, B, ValueB),
+	( ValueA > ValueB ->
+		C = A
+	;
+		C = B
 	),
-	asserta(Rule),
-	asserta(comparator_inverse_memo(Eval, Comp)),
 	!.
 
 
@@ -463,8 +448,7 @@ long_snake_ga(Dimension, N, Snake) :-
 	long_snake_ga_(Dimension, Population, N, Snake).
 
 long_snake_ga_(Dimension, Population, 0, Best) :-
-	comparator_inverse(ga_fitness(Dimension), Comp),
-	mergesort(Population, Comp, SortedPop),
+	mergesort(Population, descending(ga_fitness(Dimension)), SortedPop),
 	SortedPop = [BestTransitions|_],
 	transition_list(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
@@ -481,8 +465,7 @@ long_snake_ga_(Dimension, Population, 0, Best) :-
 	!.
 
 long_snake_ga_(Dimension, Population, Generation, Best) :-
-	comparator_inverse(ga_fitness(Dimension), Comp),
-	mergesort(Population, Comp, SortedPop),
+	mergesort(Population, descending(ga_fitness(Dimension)), SortedPop),
 	SortedPop = [A,B|_],
 
 	transition_list(CurrentBestPath, A),
@@ -514,7 +497,7 @@ sorting_test :-
 	D = 3,
 	N = 500,
 	ga_random_population(D, N, Pop),
-	comparator_inverse(ga_fitness(D), Comp),
+	descending(ga_fitness(D), Comp),
 
 	format('Sorting ~w random paths in dimension ~w\n', [N, D]),
 
