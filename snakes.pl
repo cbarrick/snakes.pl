@@ -472,14 +472,14 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 
 
 %% long_snake_ga(+Dimension, -Snake)
-% Find a long snake using a ginetic algorithm. Runs for 500 generations.
+% Find a long snake using a genetic algorithm. Runs for 500 generations.
 
 long_snake_ga(Dimension, Snake) :-
 	long_snake_ga(Dimension, -500, Snake).
 
 
 %% long_snake_ga(+Dimension, +N, -Snake)
-% Find a long snake using a ginetic algorithm. If N is negative, runs for that
+% Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
 
 long_snake_ga(Dimension, N, Snake) :-
