@@ -244,9 +244,6 @@ mergesort(List, Comp, Sorted) :-
 	thread_join(FrontThread, exited(SortedFront)),
 	thread_join(BackThread, exited(SortedBack)),
 
-	% mergesort(Front, Comp, SortedFront),
-	% mergesort(Back, Comp, SortedBack),
-
 	merge(SortedFront, SortedBack, Comp, Sorted).
 
 merge([], Ys, _, Ys) :- !.
@@ -271,7 +268,8 @@ merge([X|XT], [Y|YT], Comp, Merged) :-
 % called with two additional arguments; the first is the item being evaluated,
 % and the second is a variable which should become bound to a numeric value
 % for the item. `ascending` binds C to the item with the smallest value, and
-% `descending` binds C to the item with the largest value.
+% `descending` binds C to the item with the largest value. If no evaluator is
+% given, the arguments are compared directly.
 
 ascending(A, B, C) :-
 	A < B,
@@ -340,6 +338,49 @@ long_snake_naive(Dimension, Snake) :-
 
 % 2: Genetic algorithm
 % --------------------------------------------------
+
+%% ga_mutate(+Dimension, +Probability, +Original, -Mutant)
+%
+
+ga_mutate(Dimension, P, Original, Mutant) :-
+	maybe(P),
+	random_select(_, Original, Smaller), % randomly remove an element
+	random(0, Dimension, New),
+	random_select(New, PartialMutant, Smaller),
+	!,
+	ga_mutate(Dimension, P, PartialMutant, Mutant).
+
+ga_mutate(_, _, Original, Original) :- !.
+
+
+%% ga_mutate_population(+Dimension, +Probability, +Population, -Mutants)
+%
+
+ga_mutate_population(Dimension, P, Population, Mutants) :-
+	findall(Mutant, (
+		member(X, Population),
+		ga_mutate(Dimension, P, X, Mutant)
+	), Mutants).
+
+
+%% ga_random_subset(+Set, +Size, -Subset)
+%
+
+ga_random_subset(_, 0, []) :- !.
+
+ga_random_subset(Set, Size, Subset) :-
+	length(Set, L),
+	L >= Size,
+	length(Subset, Size),
+	Subset = [H|T],
+	random_select(H, Set, Rest),
+	NextSize is Size - 1,
+	!,
+	ga_random_subset(Rest, NextSize, T).
+
+% the case where the set is smaller than the desired size
+ga_random_subset(S, _, S) :- !.
+
 
 %% ga_offspring(+Mother, +Father, ?Child)
 % True when Child is an offspring of Mother and Father. That is, at some
@@ -448,13 +489,15 @@ long_snake_ga(Dimension, N, Snake) :-
 	long_snake_ga_(Dimension, Population, N, Snake).
 
 long_snake_ga_(Dimension, Population, 0, Best) :-
-	mergesort(Population, descending(ga_fitness(Dimension)), SortedPop),
-	SortedPop = [BestTransitions|_],
+	ga_random_subset(Population, 100, PopulationSub),
+	ga_mutate_population(Dimension, 0.1, PopulationSub, PopulationMut),
+	mergesort(PopulationMut, descending(ga_fitness(Dimension)), PopulationSort),
+	PopulationSort = [BestTransitions|_],
 	transition_list(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
 
 	ga_fitness(Dimension, BestTransitions, BestFitness),
-	length(Population, PopSize),
+	length(PopulationSort, PopSize),
 	length(Best, BestLength),
 	format('generation 0:\n', []),
 	format('  population size = ~w\n', [PopSize]),
@@ -465,13 +508,15 @@ long_snake_ga_(Dimension, Population, 0, Best) :-
 	!.
 
 long_snake_ga_(Dimension, Population, Generation, Best) :-
-	mergesort(Population, descending(ga_fitness(Dimension)), SortedPop),
-	SortedPop = [A,B|_],
+	ga_random_subset(Population, 100, PopulationSub),
+	ga_mutate_population(Dimension, 0.05, PopulationSub, PopulationMut),
+	mergesort(PopulationMut, descending(ga_fitness(Dimension)), PopulationSort),
+	PopulationSort = [A,B|_],
 
 	transition_list(CurrentBestPath, A),
 	prune(Dimension, CurrentBestPath, CurrentBestSnake),
 	ga_fitness(Dimension, A, BestFitness),
-	length(Population, PopSize),
+	length(PopulationSort, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
 	format('generation ~w:\n', [Generation]),
 	format('  population size = ~w\n', [PopSize]),
@@ -480,8 +525,7 @@ long_snake_ga_(Dimension, Population, Generation, Best) :-
 	format('  fitness = ~w\n', [BestFitness]),
 
 	ga_random_path(Dimension, Random1),
-	ga_random_path(Dimension, Random2),
-	ga_breed_population([A,B,Random1,Random2], NextPopulation),
+	ga_breed_population([A,B,Random1], NextPopulation),
 	NextGeneration is Generation + 1,
 	!,
 	long_snake_ga_(Dimension, [A,B|NextPopulation], NextGeneration, Best).
