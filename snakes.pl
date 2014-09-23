@@ -417,19 +417,24 @@ ga_random_path_(Dimension, Transitions) :-
 	ga_random_path_(Dimension, T).
 
 
-%% ga_random_population(+Dimension, +Size, -Population)
+%% ga_random_population(+Dimension, +SurvivalRate, -Population)
 % Generate a Population of random transition lists for paths in the hypercube
 % of the given Dimension. Each transition list will have a length of
 % ceiling(0.4 * 2 ^ Dimension), which is long enough to represent the longest
 % snake.
+%
+% The implementation works by breeding 4 random paths with each other using
+% a high mutation rate and the given SurvivalRate. This is slower than simply
+% generating a whole bunch of random paths, but has the benifit that the size
+% of the random population will be of the same scale as non-random populations
+% bred with the same SurvivalRate and number of parents.
 
-ga_random_population(_, 0, []) :- !.
-
-ga_random_population(Dimension, Size, Population) :-
-	Population = [H|T],
-	ga_random_path(Dimension, H),
-	S0 is Size - 1,
-	ga_random_population(Dimension, S0, T).
+ga_random_population(Dimension, SurvivalRate, Population) :-
+	ga_random_path(Dimension, A),
+	ga_random_path(Dimension, B),
+	ga_random_path(Dimension, C),
+	ga_random_path(Dimension, D),
+	ga_breed_population(Dimension, [A,B,C,D], SurvivalRate, 0.99, Population).
 
 
 %% ga_fitness(+Dimension, +Transitions, -Fitness)
@@ -454,7 +459,7 @@ long_snake_ga(Dimension, N, SurvivalRate, MutationRate, Snake) :-
 	format('dimension: ~w\n', [Dimension]),
 	format('survival rate: ~w\n', [SurvivalRate]),
 	format('mutation rate: ~w\n', [MutationRate]),
-	ga_random_population(Dimension, 100, Population),
+	ga_random_population(Dimension, SurvivalRate, Population),
 	long_snake_ga_(Dimension, Population, N, SurvivalRate, MutationRate, Snake).
 
 long_snake_ga_(Dimension, Population, 0, _, _, Best) :-
@@ -542,7 +547,10 @@ main :-
 	% The longest snake in 7D is 51 nodes
 	Dimension = 7,
 
-	% When breading a population, this determines how many children survive
+	% When breading, not all possible children are returned. Some children "die"
+	% before becoming productive. This determines how many children survive.
+	% Lower rates mean each generation is faster, higher rates mean each
+	% generation is better. The goal is to optimize execution speed.
 	SurvivalRate = 0.25,
 
 	% Mutations stack, i.e. at 0.1 there is a 10% chance to mutate once,
