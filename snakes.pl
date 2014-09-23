@@ -1,4 +1,4 @@
-#!/usr/bin/env swipl
+#!/usr/bin/env swipl -g main
 
 % snakes.pl -- A snake-in-the-box solver
 % Copyright (C) 2014  Chris Barrick <cbarrick1@gmail.com>
@@ -31,9 +31,6 @@
 % as the number of _nodes_ here.
 %
 % Our goal is to identify really long snakes.
-
-
-:- initialization main.
 
 
 % 0: Graph definitions and helper predicates
@@ -153,15 +150,6 @@ prune(Dimension, Path, Path) :- snake(Dimension, Path), !.
 prune(Dimension, Path, Snake) :-
 	Path = [_|T],
 	prune(Dimension, T, Snake).
-
-
-%% long_snake(+Dimension, -Snake)
-% Gets a long Snake in a given Dimension.
-% This is the general interface that all search algorithms expose.
-% This predicate may be aliased to any of the concrete implementations.
-
-long_snake(Dimension, Snake) :-
-	long_snake_naive(Dimension, Snake).
 
 
 %% quicksort(+List, +Comparator, -Sorted)
@@ -345,7 +333,11 @@ long_snake_naive(Dimension, Snake) :-
 % --------------------------------------------------
 
 %% ga_mutate(+Dimension, +Probability, +Original, -Mutant)
-%
+% Given a mutation Probability and an Original transition list in the hypercube
+% of the given Dimension, Mutant is a list derived from the Original by
+% inserting and removing transitions at random locations. Mutant will be the
+% same length as the original. Mutations may stack, i.e. there chance of
+% mutating N times is Probability^N
 
 ga_mutate(Dimension, P, Original, Mutant) :-
 	maybe(P),
@@ -359,7 +351,9 @@ ga_mutate(_, _, Original, Original) :- !.
 
 
 %% ga_mutate_population(+Dimension, +Probability, +Population, -Mutants)
-%
+% Given a mutation Probability and a population of transition lists in the
+% hypercube of the given Dimension, Mutants is the result of applying the
+% mutation algorithm to each of the members of the Population.
 
 ga_mutate_population(Dimension, P, Population, Mutants) :-
 	findall(Mutant, (
@@ -369,9 +363,12 @@ ga_mutate_population(Dimension, P, Population, Mutants) :-
 
 
 %% ga_random_subset(+Set, +Size, -Subset)
-%
+% Randomly select a Subset of length Size out of Set.
+% If Size is 'inf', Subset = Set.
 
 ga_random_subset(_, 0, []) :- !.
+
+ga_random_subset(Set, inf, Set) :- !.
 
 ga_random_subset(Set, Size, Subset) :-
 	length(Set, L),
@@ -476,13 +473,6 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 	Fitness is (Dimension * X) + Y.
 
 
-%% long_snake_ga(+Dimension, -Snake)
-% Find a long snake using a genetic algorithm. Runs for 500 generations.
-
-long_snake_ga(Dimension, Snake) :-
-	long_snake_ga(Dimension, -500, 100, 0.1, Snake).
-
-
 %% long_snake_ga(+Dimension, +N, +PopulationSize, +MutationProbability, -Snake)
 % Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
@@ -543,6 +533,7 @@ long_snake_ga_(Dimension, Population, N, PopulationSize, MutationProbability, Be
 % --------------------------------------------------
 
 % An experiment on sorting algorithms
+% Mergesort seems to be fastest
 sorting_test :-
 	D = 3,
 	N = 500,
@@ -577,4 +568,15 @@ sorting_test :-
 % Find the longest snake in 7D using the GA
 % This will run indefinitly, printing results after each generation
 main :-
-	long_snake_ga(7, 1, 200, 0.1, _).
+
+	% The longest snake in 7D is 51 nodes
+	Dimension = 7,
+
+	% The maximum population size for 7D with 4 parents is 600-ish
+	PopulationSize = 200,
+
+	% Mutations stack, i.e. at 0.1 there is a 10% chance to mutate once,
+	% a 1% chance to mutate twice, 0.1% chance to mutate 3 times, etc
+	MutationProbability = 0.1,
+
+	long_snake_ga(Dimension, 1, PopulationSize, MutationProbability, _).
