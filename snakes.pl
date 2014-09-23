@@ -350,40 +350,6 @@ ga_mutate(Dimension, P, Original, Mutant) :-
 ga_mutate(_, _, Original, Original) :- !.
 
 
-%% ga_mutate_population(+Dimension, +Probability, +Population, -Mutants)
-% Given a mutation Probability and a population of transition lists in the
-% hypercube of the given Dimension, Mutants is the result of applying the
-% mutation algorithm to each of the members of the Population.
-
-ga_mutate_population(Dimension, P, Population, Mutants) :-
-	findall(Mutant, (
-		member(X, Population),
-		ga_mutate(Dimension, P, X, Mutant)
-	), Mutants).
-
-
-%% ga_random_subset(+Set, +Size, -Subset)
-% Randomly select a Subset of length Size out of Set.
-% If Size is 'inf', Subset = Set.
-
-ga_random_subset(_, 0, []) :- !.
-
-ga_random_subset(Set, inf, Set) :- !.
-
-ga_random_subset(Set, Size, Subset) :-
-	length(Set, L),
-	L >= Size,
-	length(Subset, Size),
-	Subset = [H|T],
-	random_select(H, Set, Rest),
-	NextSize is Size - 1,
-	!,
-	ga_random_subset(Rest, NextSize, T).
-
-% the case where the set is smaller than the desired size
-ga_random_subset(S, _, S) :- !.
-
-
 %% ga_offspring(+Mother, +Father, ?Child)
 % True when Child is an offspring of Mother and Father. That is, at some
 % crossover point, every element before that point in Child is from Mother,
@@ -407,18 +373,24 @@ ga_offspring_([MH|MT], [FH|FT], [CH|CT], Crossover) :-
 	ga_offspring_(MT, FT, CT, NextCrossover).
 
 
-%% ga_breed_population(+Parents, -Population)
-% Given a list of parents, generates a Population of all possible offspring.
+%% ga_breed_population(+Dimension, +Parents, +SurvivalRate, +MutationRate, -Population)
+% Given a list of Parents (transition lists for the hypercube of the given
+% Dimension), a SurvivalRate, and a MutationRate, Population is a new population
+% bread from the Parents. The first parent always carries over into the new
+% population.
 
-ga_breed_population(Parents, Population) :-
+ga_breed_population(Dimension, Parents, SurvivalRate, MutationRate, Population) :-
 	length(Parents, L),
 	L >= 2,
+	Parents = [First|_],
 	findall(Child, (
 		select(Father, Parents, Rest),
 		select(Mother, Rest, _),
-		ga_offspring(Mother, Father, Child)
+		ga_offspring(Mother, Father, Child_),
+		maybe(SurvivalRate),
+		ga_mutate(Dimension, MutationRate, Child_, Child)
 	), Population_),
-	sort(Population_, Population).
+	sort([First|Population_], Population).
 
 
 %% ga_random_path(+Dimension, -Transitions)
@@ -473,17 +445,17 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 	Fitness is (Dimension * X) + Y.
 
 
-%% long_snake_ga(+Dimension, +N, +PopulationSize, +MutationProbability, -Snake)
+%% long_snake_ga(+Dimension, +N, +SurvivalRate, +MutationRate, -Snake)
 % Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
 
-long_snake_ga(Dimension, N, PopulationSize, MutationProbability, Snake) :-
+long_snake_ga(Dimension, N, SurvivalRate, MutationRate, Snake) :-
 	format('long_snake_ga: genetic algorithm search\n', []),
 	format('dimension: ~w\n', [Dimension]),
-	format('population size: ~w\n', [PopulationSize]),
-	format('mutation probability: ~w\n', [MutationProbability]),
+	format('survival rate: ~w\n', [SurvivalRate]),
+	format('mutation rate: ~w\n', [MutationRate]),
 	ga_random_population(Dimension, 100, Population),
-	long_snake_ga_(Dimension, Population, N, PopulationSize, MutationProbability, Snake).
+	long_snake_ga_(Dimension, Population, N, SurvivalRate, MutationRate, Snake).
 
 long_snake_ga_(Dimension, Population, 0, _, _, Best) :-
 	mergesort(Population, descending(ga_fitness(Dimension)), PopulationSort),
@@ -502,7 +474,7 @@ long_snake_ga_(Dimension, Population, 0, _, _, Best) :-
 	format('DONE\n'),
 	!.
 
-long_snake_ga_(Dimension, Population, N, PopulationSize, MutationProbability, Best) :-
+long_snake_ga_(Dimension, Population, N, SurvivalRate, MutationRate, Best) :-
 	mergesort(Population, descending(ga_fitness(Dimension)), SortedPopulation),
 	SortedPopulation = [A,B|_],
 
@@ -519,12 +491,10 @@ long_snake_ga_(Dimension, Population, N, PopulationSize, MutationProbability, Be
 
 	ga_random_path(Dimension, Random1),
 	ga_random_path(Dimension, Random2),
-	ga_breed_population([A,B,Random1,Random2], AllChildren),
-	ga_random_subset(AllChildren, PopulationSize, NextPopulation_),
-	ga_mutate_population(Dimension, MutationProbability, NextPopulation_, NextPopulation),
+	ga_breed_population(Dimension, [A,B,Random1,Random2], SurvivalRate, MutationRate, NextPopulation),
 	N1 is N + 1,
 	!,
-	long_snake_ga_(Dimension, [A,B|NextPopulation], N1, PopulationSize, MutationProbability, Best).
+	long_snake_ga_(Dimension, [A,B|NextPopulation], N1, SurvivalRate, MutationRate, Best).
 
 
 
@@ -572,11 +542,11 @@ main :-
 	% The longest snake in 7D is 51 nodes
 	Dimension = 7,
 
-	% The maximum population size for 7D with 4 parents is 600-ish
-	PopulationSize = 200,
+	% When breading a population, this determines how many children survive
+	SurvivalRate = 0.25,
 
 	% Mutations stack, i.e. at 0.1 there is a 10% chance to mutate once,
 	% a 1% chance to mutate twice, 0.1% chance to mutate 3 times, etc
-	MutationProbability = 0.1,
+	MutationRate = 0.1,
 
-	long_snake_ga(Dimension, 1, PopulationSize, MutationProbability, _).
+	long_snake_ga(Dimension, 1, SurvivalRate, MutationRate, _).
