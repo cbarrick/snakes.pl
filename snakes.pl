@@ -1,3 +1,5 @@
+#!/usr/bin/env swipl
+
 % snakes.pl -- A snake-in-the-box solver
 % Copyright (C) 2014  Chris Barrick <cbarrick1@gmail.com>
 %
@@ -29,6 +31,9 @@
 % as the number of _nodes_ here.
 %
 % Our goal is to identify really long snakes.
+
+
+:- initialization main.
 
 
 % 0: Graph definitions and helper predicates
@@ -475,23 +480,23 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 % Find a long snake using a genetic algorithm. Runs for 500 generations.
 
 long_snake_ga(Dimension, Snake) :-
-	long_snake_ga(Dimension, -500, Snake).
+	long_snake_ga(Dimension, -500, 100, 0.1, Snake).
 
 
-%% long_snake_ga(+Dimension, +N, -Snake)
+%% long_snake_ga(+Dimension, +N, +PopulationSize, +MutationProbability, -Snake)
 % Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
 
-long_snake_ga(Dimension, N, Snake) :-
+long_snake_ga(Dimension, N, PopulationSize, MutationProbability, Snake) :-
 	format('long_snake_ga: genetic algorithm search\n', []),
-	format('working in dimension ~w\n', [Dimension]),
+	format('dimension: ~w\n', [Dimension]),
+	format('population size: ~w\n', [PopulationSize]),
+	format('mutation probability: ~w\n', [MutationProbability]),
 	ga_random_population(Dimension, 100, Population),
-	long_snake_ga_(Dimension, Population, N, Snake).
+	long_snake_ga_(Dimension, Population, N, PopulationSize, MutationProbability, Snake).
 
-long_snake_ga_(Dimension, Population, 0, Best) :-
-	ga_random_subset(Population, 100, PopulationSub),
-	ga_mutate_population(Dimension, 0.1, PopulationSub, PopulationMut),
-	mergesort(PopulationMut, descending(ga_fitness(Dimension)), PopulationSort),
+long_snake_ga_(Dimension, Population, 0, _, _, Best) :-
+	mergesort(Population, descending(ga_fitness(Dimension)), PopulationSort),
 	PopulationSort = [BestTransitions|_],
 	transition_list(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
@@ -507,28 +512,29 @@ long_snake_ga_(Dimension, Population, 0, Best) :-
 	format('DONE\n'),
 	!.
 
-long_snake_ga_(Dimension, Population, Generation, Best) :-
-	ga_random_subset(Population, 100, PopulationSub),
-	ga_mutate_population(Dimension, 0.05, PopulationSub, PopulationMut),
-	mergesort(PopulationMut, descending(ga_fitness(Dimension)), PopulationSort),
-	PopulationSort = [A,B|_],
+long_snake_ga_(Dimension, Population, N, PopulationSize, MutationProbability, Best) :-
+	mergesort(Population, descending(ga_fitness(Dimension)), SortedPopulation),
+	SortedPopulation = [A,B|_],
 
 	transition_list(CurrentBestPath, A),
 	prune(Dimension, CurrentBestPath, CurrentBestSnake),
 	ga_fitness(Dimension, A, BestFitness),
-	length(PopulationSort, PopSize),
+	length(SortedPopulation, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
-	format('generation ~w:\n', [Generation]),
+	format('generation ~w:\n', [N]),
 	format('  population size = ~w\n', [PopSize]),
 	format('  best snake = ~w\n', [CurrentBestSnake]),
 	format('  length (nodes) = ~w\n', [CurrentBestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 
 	ga_random_path(Dimension, Random1),
-	ga_breed_population([A,B,Random1], NextPopulation),
-	NextGeneration is Generation + 1,
+	ga_random_path(Dimension, Random2),
+	ga_breed_population([A,B,Random1,Random2], AllChildren),
+	ga_random_subset(AllChildren, PopulationSize, NextPopulation_),
+	ga_mutate_population(Dimension, MutationProbability, NextPopulation_, NextPopulation),
+	N1 is N + 1,
 	!,
-	long_snake_ga_(Dimension, [A,B|NextPopulation], NextGeneration, Best).
+	long_snake_ga_(Dimension, [A,B|NextPopulation], N1, PopulationSize, MutationProbability, Best).
 
 
 
@@ -571,4 +577,4 @@ sorting_test :-
 % Find the longest snake in 7D using the GA
 % This will run indefinitly, printing results after each generation
 main :-
-	long_snake_ga(7, 1, _).
+	long_snake_ga(7, 1, 200, 0.1, _).
