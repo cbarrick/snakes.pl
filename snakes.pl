@@ -463,13 +463,20 @@ ga_random_population(Dimension, SurvivalRate, Population) :-
 % Calculate the Fitness score for a list of Transitions describing a path
 % in the hypercube of the given Dimension.
 
+:- dynamic(ga_fitness_memo/3).
+
+ga_fitness(Dimension, Transitions, Fitness) :-
+	ga_fitness_memo(Dimension, Transitions, Fitness),
+	!.
+
 ga_fitness(Dimension, Transitions, Fitness) :-
 	transition_list(Path, Transitions),
 	prune(Dimension, Path, Snake),
 	findall(Node, available(Dimension, Snake, Node), Available),
 	length(Snake, X),
 	length(Available, Y),
-	Fitness is (Dimension * X) + Y.
+	Fitness is (Dimension * X) + Y,
+	asserta(ga_fitness_memo(Dimension, Transitions, Fitness)).
 
 
 %% long_snake_ga(+Dimension, +N, +SelectionWeight, +SurvivalRate, +MutationRate, -Snake)
@@ -486,8 +493,10 @@ long_snake_ga(Dimension, N, SelectionWeight, SurvivalRate, MutationRate, Snake) 
 	long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, MutationRate, Snake).
 
 long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
+	statistics(real_time, _),
 	mergesort(Population, descending(ga_fitness(Dimension)), PopulationSort),
 	PopulationSort = [BestTransitions|_],
+	statistics(real_time, [_, TimeTaken]),
 
 	transition_list(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
@@ -495,6 +504,7 @@ long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
 	length(PopulationSort, PopSize),
 	length(Best, BestLength),
 	format('generation 0:\n', []),
+	format('  time = ~ws\n', [TimeTaken]),
 	format('  population size = ~w\n', [PopSize]),
 	format('  best snake = ~w\n', [Best]),
 	format('  length (nodes) = ~w\n', [BestLength]),
@@ -503,8 +513,10 @@ long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
 	!.
 
 long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, MutationRate, Best) :-
+	statistics(real_time, _),
 	mergesort(Population, descending(ga_fitness(Dimension)), SortedPopulation),
 	SortedPopulation = [CurrentBest|Rest],
+	statistics(real_time, [_, TimeTaken]),
 
 	transition_list(CurrentBestPath, CurrentBest),
 	prune(Dimension, CurrentBestPath, CurrentBestSnake),
@@ -512,6 +524,7 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 	length(SortedPopulation, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
 	format('generation ~w:\n', [N]),
+	format('  time = ~ws\n', [TimeTaken]),
 	format('  population size = ~w\n', [PopSize]),
 	format('  best snake = ~w\n', [CurrentBestSnake]),
 	format('  length (nodes) = ~w\n', [CurrentBestLength]),
