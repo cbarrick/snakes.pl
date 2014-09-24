@@ -479,6 +479,24 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 	asserta(ga_fitness_memo(Dimension, Transitions, Fitness)).
 
 
+%% ga_cleanup, ga_cleanup_auto
+% Cleans up the memos left by the `ga_fitness/3` and `snake/2` predicates.
+% The "auto" version only cleans up every 10th time that it is called.
+
+ga_cleanup :-
+	flag('ga_cleanup_auto last_cleanup', _, 0),
+	retractall(ga_fitness_memo(_,_,_)),
+	retractall(snake_memo(_,_)).
+
+ga_cleanup_auto :-
+	flag('ga_cleanup_auto last_cleanup', N, N+1),
+	( N =:= 9 ->
+		ga_cleanup
+	;
+		true
+	).
+
+
 %% long_snake_ga(+Dimension, +N, +SelectionWeight, +SurvivalRate, +MutationRate, -Snake)
 % Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
@@ -517,6 +535,8 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 	mergesort(Population, descending(ga_fitness(Dimension)), SortedPopulation),
 	SortedPopulation = [CurrentBest|Rest],
 	statistics(real_time, [_, TimeTaken]),
+
+	ga_cleanup_auto,
 
 	transition_list(CurrentBestPath, CurrentBest),
 	prune(Dimension, CurrentBestPath, CurrentBestSnake),
