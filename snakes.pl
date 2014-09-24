@@ -332,6 +332,18 @@ long_snake_naive(Dimension, Snake) :-
 % 2: Genetic algorithm
 % --------------------------------------------------
 
+%% ga_roulette_select(+Weight, -X, +List, -Rest)
+%
+
+ga_roulette_select(Weight, X, List, Rest) :-
+	select(X, List, Rest),
+	maybe(Weight),
+	!.
+
+ga_roulette_select(_, X, List, Rest) :-
+	random_select(X, List, Rest).
+
+
 %% ga_mutate(+Dimension, +Probability, +Original, -Mutant)
 % Given a mutation Probability and an Original transition list in the hypercube
 % of the given Dimension, Mutant is a list derived from the Original by
@@ -450,24 +462,25 @@ ga_fitness(Dimension, Transitions, Fitness) :-
 	Fitness is (Dimension * X) + Y.
 
 
-%% long_snake_ga(+Dimension, +N, +SurvivalRate, +MutationRate, -Snake)
+%% long_snake_ga(+Dimension, +N, +SelectionWeight, +SurvivalRate, +MutationRate, -Snake)
 % Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
 
-long_snake_ga(Dimension, N, SurvivalRate, MutationRate, Snake) :-
+long_snake_ga(Dimension, N, SelectionWeight, SurvivalRate, MutationRate, Snake) :-
 	format('long_snake_ga: genetic algorithm search\n', []),
 	format('dimension: ~w\n', [Dimension]),
+	format('selection weight: ~w\n', [SelectionWeight]),
 	format('survival rate: ~w\n', [SurvivalRate]),
 	format('mutation rate: ~w\n', [MutationRate]),
 	ga_random_population(Dimension, SurvivalRate, Population),
-	long_snake_ga_(Dimension, Population, N, SurvivalRate, MutationRate, Snake).
+	long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, MutationRate, Snake).
 
-long_snake_ga_(Dimension, Population, 0, _, _, Best) :-
+long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
 	mergesort(Population, descending(ga_fitness(Dimension)), PopulationSort),
 	PopulationSort = [BestTransitions|_],
+
 	transition_list(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
-
 	ga_fitness(Dimension, BestTransitions, BestFitness),
 	length(PopulationSort, PopSize),
 	length(Best, BestLength),
@@ -479,13 +492,13 @@ long_snake_ga_(Dimension, Population, 0, _, _, Best) :-
 	format('DONE\n'),
 	!.
 
-long_snake_ga_(Dimension, Population, N, SurvivalRate, MutationRate, Best) :-
+long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, MutationRate, Best) :-
 	mergesort(Population, descending(ga_fitness(Dimension)), SortedPopulation),
-	SortedPopulation = [A,B|_],
+	SortedPopulation = [CurrentBest|Rest],
 
-	transition_list(CurrentBestPath, A),
+	transition_list(CurrentBestPath, CurrentBest),
 	prune(Dimension, CurrentBestPath, CurrentBestSnake),
-	ga_fitness(Dimension, A, BestFitness),
+	ga_fitness(Dimension, CurrentBest, BestFitness),
 	length(SortedPopulation, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
 	format('generation ~w:\n', [N]),
@@ -494,12 +507,13 @@ long_snake_ga_(Dimension, Population, N, SurvivalRate, MutationRate, Best) :-
 	format('  length (nodes) = ~w\n', [CurrentBestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 
-	ga_random_path(Dimension, Random1),
-	ga_random_path(Dimension, Random2),
-	ga_breed_population(Dimension, [A,B,Random1,Random2], SurvivalRate, MutationRate, NextPopulation),
+	ga_roulette_select(SelectionWeight, A, Rest, Rest_),
+	ga_roulette_select(SelectionWeight, B, Rest_, _),
+	ga_random_path(Dimension, Random),
+	ga_breed_population(Dimension, [CurrentBest,A,B,Random], SurvivalRate, MutationRate, NextPopulation),
 	N1 is N + 1,
 	!,
-	long_snake_ga_(Dimension, [A,B|NextPopulation], N1, SurvivalRate, MutationRate, Best).
+	long_snake_ga_(Dimension, [CurrentBest|NextPopulation], N1, SelectionWeight, SurvivalRate, MutationRate, Best).
 
 
 
@@ -547,6 +561,11 @@ main :-
 	% The longest snake in 7D is 51 nodes
 	Dimension = 7,
 
+	% During mate selection, we use a modified roulette select. This determines
+	% how strongly better solutions should be favored. Higher values quickly
+	% reduse the set of likely candidates.
+	SelectionWeight = 0.15,
+
 	% When breading, not all possible children are returned. Some children "die"
 	% before becoming productive. This determines how many children survive.
 	% Lower rates mean each generation is faster, higher rates mean each
@@ -557,4 +576,4 @@ main :-
 	% a 1% chance to mutate twice, 0.1% chance to mutate 3 times, etc
 	MutationRate = 0.1,
 
-	long_snake_ga(Dimension, 1, SurvivalRate, MutationRate, _).
+	long_snake_ga(Dimension, 1, SelectionWeight, SurvivalRate, MutationRate, _).
