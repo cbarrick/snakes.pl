@@ -332,8 +332,18 @@ long_snake_naive(Dimension, Snake) :-
 % 2: Genetic algorithm
 % --------------------------------------------------
 
+%% ga_roulette_select(-X, +List, -Rest)
 %% ga_roulette_select(+Weight, -X, +List, -Rest)
 %
+
+ga_roulette_select(X, List, Rest) :-
+	length(List, L),
+	Weight is 1 / (L / 4), % The mean selected item will be the 1st quartile
+	ga_roulette_select(Weight, X, List, Rest).
+
+ga_roulette_select(auto, X, List, Rest) :-
+	!,
+	ga_roulette_select(X, List, Rest).
 
 ga_roulette_select(Weight, X, List, Rest) :-
 	select(X, List, Rest),
@@ -522,7 +532,7 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 % --------------------------------------------------
 
 % An experiment on sorting algorithms
-% Mergesort seems to be fastest
+% Results: Mergesort is faster
 sorting_test :-
 	D = 3,
 	N = 500,
@@ -554,6 +564,40 @@ sorting_test :-
 	Xs = Ys.
 
 
+% An experiment on selection weights
+% Results: The weight 1/n will select the nth element on average
+% with a standard deviation of n.
+selection_weight_test :-
+	findall(P, between(1, 1000, P), Population),
+	length(Population, PopulationSize),
+	format('population size: ~w\n', [PopulationSize]),
+
+	TrialSize = 1000,
+	format('trail size: ~w\n', [TrialSize]),
+
+	write('-----\n'),
+
+	Trials = [0.01, 0.02, 0.03, 0.1, 0.2, 0.3, 1],
+
+	forall( member(Weight, Trials), (
+		format('weight: ~w\n', [Weight]),
+
+		findall(S, (
+			between(1, TrialSize, _),
+			ga_roulette_select(Weight, S, Population, _)
+		), Ss ),
+
+		sum_list(Ss, Sum),
+		Mean is Sum / TrialSize,
+		format('  mean: ~w\n', [Mean]),
+
+		findall(X, (member(X_, Ss), X is (X_ - Mean) ^ 2), Xs),
+		sum_list(Xs, Y),
+		StandardDeviation is sqrt(Y / TrialSize),
+		format('  standard deviation: ~w\n', [StandardDeviation])
+	)).
+
+
 % Find the longest snake in 7D using the GA
 % This will run indefinitly, printing results after each generation
 main :-
@@ -563,8 +607,9 @@ main :-
 
 	% During mate selection, we use a modified roulette select. This determines
 	% how strongly better solutions should be favored. Higher values quickly
-	% reduse the set of likely candidates.
-	SelectionWeight = 0.15,
+	% reduse the set of likely candidates. A value of 'auto' will select the
+	% first quartile with a standard deviation of 1/4 of the population.
+	SelectionWeight = auto,
 
 	% When breading, not all possible children are returned. Some children "die"
 	% before becoming productive. This determines how many children survive.
