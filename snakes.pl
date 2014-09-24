@@ -332,25 +332,29 @@ long_snake_naive(Dimension, Snake) :-
 % 2: Genetic algorithm
 % --------------------------------------------------
 
-%% ga_roulette_select(-X, +List, -Rest)
-%% ga_roulette_select(+Weight, -X, +List, -Rest)
-%
+%% ga_select(-X, +List, -Rest)
+%% ga_select(+Weight, -X, +List, -Rest)
+% Selects X from the List and returns the Rest. First, we try to select the
+% first element with a probability of Weight. If that fails, we try the next
+% element. If Weight is not given or is the atom 'auto', then the Weight is
+% derived such that the selection targets the 1st quartile with an accuracy
+% such that the first and middle elements are within 1 standard deviation.
 
-ga_roulette_select(X, List, Rest) :-
+ga_select(X, List, Rest) :-
 	length(List, L),
 	Weight is 1 / (L / 4), % The mean selected item will be the 1st quartile
-	ga_roulette_select(Weight, X, List, Rest).
+	ga_select(Weight, X, List, Rest).
 
-ga_roulette_select(auto, X, List, Rest) :-
+ga_select(auto, X, List, Rest) :-
 	!,
-	ga_roulette_select(X, List, Rest).
+	ga_select(X, List, Rest).
 
-ga_roulette_select(Weight, X, List, Rest) :-
+ga_select(Weight, X, List, Rest) :-
 	select(X, List, Rest),
 	maybe(Weight),
 	!.
 
-ga_roulette_select(_, X, List, Rest) :-
+ga_select(_, X, List, Rest) :-
 	random_select(X, List, Rest).
 
 
@@ -550,15 +554,13 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 	format('  length (nodes) = ~w\n', [CurrentBestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 
-	ga_roulette_select(SelectionWeight, A, Rest, Rest_),
-	ga_roulette_select(SelectionWeight, B, Rest_, _),
+	ga_select(SelectionWeight, A, Rest, Rest_),
+	ga_select(SelectionWeight, B, Rest_, _),
 	ga_random_path(Dimension, Random),
 	ga_breed_population(Dimension, [CurrentBest,A,B,Random], SurvivalRate, MutationRate, NextPopulation),
 	N1 is N + 1,
 	!,
 	long_snake_ga_(Dimension, [CurrentBest|NextPopulation], N1, SelectionWeight, SurvivalRate, MutationRate, Best).
-
-
 
 
 % Experiments
@@ -617,7 +619,7 @@ selection_weight_test :-
 
 		findall(S, (
 			between(1, TrialSize, _),
-			ga_roulette_select(Weight, S, Population, _)
+			ga_select(Weight, S, Population, _)
 		), Ss ),
 
 		sum_list(Ss, Sum),
@@ -635,7 +637,7 @@ selection_weight_test :-
 % This will run indefinitly, printing results after each generation
 main :-
 
-	% The longest snake in 7D is 51 nodes
+	% The longest snake in 7D is 51 nodes.
 	Dimension = 7,
 
 	% During mate selection, we use a modified roulette select. This determines
@@ -650,8 +652,8 @@ main :-
 	% generation is better. The goal is to optimize execution speed.
 	SurvivalRate = 0.25,
 
-	% Mutations stack, i.e. at 0.1 there is a 10% chance to mutate once,
-	% a 1% chance to mutate twice, 0.1% chance to mutate 3 times, etc
+	% Mutations stack: at 0.1, each solution has a 10% chance to mutate once,
+	% a 1% chance to mutate twice, a 0.1% chance to mutate 3 times, etc.
 	MutationRate = 0.1,
 
 	long_snake_ga(Dimension, 1, SelectionWeight, SurvivalRate, MutationRate, _).
