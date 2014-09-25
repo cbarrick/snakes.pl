@@ -569,18 +569,19 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 % An experiment on sorting algorithms
 % Results: Mergesort is faster
 sorting_test :-
-	D = 3,
-	N = 500,
-	ga_random_population(D, N, Pop),
-	descending(ga_fitness(D), Comp),
+	D = 6,
+	ga_random_population(D, 1, Pop),
+	length(Pop, N),
 
 	format('Sorting ~w random paths in dimension ~w\n', [N, D]),
 
 	format('\nquicksort:\n'),
-	time(quicksort(Pop, Comp, Sorted1)),
+	ga_cleanup,
+	time(quicksort(Pop, descending(ga_fitness(D)), Sorted1)),
 
 	format('\nmergesort\n'),
-	time(mergesort(Pop, Comp, Sorted2)),
+	ga_cleanup,
+	time(mergesort(Pop, descending(ga_fitness(D)), Sorted2)),
 
 	% Check that the lists are equivalent
 	% The sorted lists may not be in the same order given that some paths
