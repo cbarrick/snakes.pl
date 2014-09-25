@@ -332,22 +332,16 @@ long_snake_naive(Dimension, Snake) :-
 % 2: Genetic algorithm
 % --------------------------------------------------
 
-%% ga_select(-X, +List, -Rest)
 %% ga_select(+Weight, -X, +List, -Rest)
-% Selects X from the List and returns the Rest. First, we try to select the
-% first element with a probability of Weight. If that fails, we try the next
-% element. If Weight is not given or is the atom 'auto', then the Weight is
-% derived such that the selection targets the 1st quartile with an accuracy
-% such that the first and middle elements are within 1 standard deviation.
-
-ga_select(X, List, Rest) :-
-	length(List, L),
-	Weight is 1 / (L / 4), % The mean selected item will be the 1st quartile
-	ga_select(Weight, X, List, Rest).
+%
 
 ga_select(auto, X, List, Rest) :-
-	!,
-	ga_select(X, List, Rest).
+	ga_select(1/4, X, List, Rest).
+
+ga_select(A/B, X, List, Rest) :-
+	length(List, L),
+	Weight is A / (L / B),
+	ga_select(Weight, X, List, Rest).
 
 ga_select(Weight, X, List, Rest) :-
 	select(X, List, Rest),
@@ -356,6 +350,18 @@ ga_select(Weight, X, List, Rest) :-
 
 ga_select(_, X, List, Rest) :-
 	random_select(X, List, Rest).
+
+
+%% ga_select_n(+N, +Weight, -Selection, +List, -Rest)
+%
+
+ga_select_n(0, _, [], List, List) :- !.
+
+ga_select_n(N, Weight, Selection, List, Rest) :-
+	Selection = [H|T],
+	ga_select(Weight, H, List, Rest_),
+	N0 is N - 1,
+	ga_select_n(N0, Weight, T, Rest_, Rest).
 
 
 %% ga_mutate(+Dimension, +Probability, +Original, -Mutant)
@@ -554,8 +560,7 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 	format('  length (nodes) = ~w\n', [CurrentBestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 
-	ga_select(SelectionWeight, A, Rest, Rest_),
-	ga_select(SelectionWeight, B, Rest_, _),
+	ga_select_n(2, SelectionWeight, [A,B], Rest, _),
 	ga_random_path(Dimension, Random),
 	ga_breed_population(Dimension, [CurrentBest,A,B,Random], SurvivalRate, MutationRate, NextPopulation),
 	N1 is N + 1,
