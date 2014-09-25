@@ -650,7 +650,7 @@ main :-
 	% before becoming productive. This determines how many children survive.
 	% Lower rates mean each generation is faster, higher rates mean each
 	% generation is better. The goal is to optimize execution speed.
-	SurvivalRate = 0.25,
+	SurvivalRate = 0.5,
 
 	% Mutations stack: at 0.1, each solution has a 10% chance to mutate once,
 	% a 1% chance to mutate twice, a 0.1% chance to mutate 3 times, etc.
