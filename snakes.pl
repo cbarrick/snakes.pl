@@ -332,36 +332,50 @@ long_snake_naive(Dimension, Snake) :-
 % 2: Genetic algorithm
 % --------------------------------------------------
 
-%% ga_select(+Weight, -X, +List, -Rest)
+%% ga_select(+Bias, -X, +List, -Rest)
 %
-
-ga_select(auto, X, List, Rest) :-
-	ga_select(1/4, X, List, Rest).
 
 ga_select(A/B, X, List, Rest) :-
 	length(List, L),
-	Weight is A / (L / B),
-	ga_select(Weight, X, List, Rest).
+	Bias is A / (L / B),
+	ga_select(Bias, X, List, Rest).
 
-ga_select(Weight, X, List, Rest) :-
+ga_select(Bias, X, List, Rest) :-
 	select(X, List, Rest),
-	maybe(Weight),
+	maybe(Bias),
 	!.
 
 ga_select(_, X, List, Rest) :-
 	random_select(X, List, Rest).
 
 
-%% ga_select_n(+N, +Weight, -Selection, +List, -Rest)
+%% ga_select_n(+N, +Bias, -Selection, +List, -Rest)
 %
+
+:- dynamic(ga_selection_state/3).
+ga_selection_state(n/a, n/a, 0.1).
 
 ga_select_n(0, _, [], List, List) :- !.
 
-ga_select_n(N, Weight, Selection, List, Rest) :-
+ga_select_n(N, auto, Selection, List, Rest) :-
+	List = [Best|_],
+	retract(ga_selection_state(OldBest, OldState, _)),
+	( Best = OldBest ->
+		State is OldState + 1,
+		Bias is max(0, 0.1 - 0.005 * State)
+	;
+		State = 0,
+		Bias is 0.1
+	),
+	asserta(ga_selection_state(Best, State, Bias)),
+	!,
+	ga_select_n(N, Bias, Selection, List, Rest).
+
+ga_select_n(N, Bias, Selection, List, Rest) :-
 	Selection = [H|T],
-	ga_select(Weight, H, List, Rest_),
+	ga_select(Bias, H, List, Rest_),
 	N0 is N - 1,
-	ga_select_n(N0, Weight, T, Rest_, Rest).
+	ga_select_n(N0, Bias, T, Rest_, Rest).
 
 
 %% ga_mutate(+Dimension, +Probability, +Original, -Mutant)
@@ -507,18 +521,18 @@ ga_cleanup_auto :-
 	).
 
 
-%% long_snake_ga(+Dimension, +N, +SelectionWeight, +SurvivalRate, +MutationRate, -Snake)
+%% long_snake_ga(+Dimension, +N, +SelectionBias, +SurvivalRate, +MutationRate, -Snake)
 % Find a long snake using a genetic algorithm. If N is negative, runs for that
 % many generations. If N = 1, run indefinitly.
 
-long_snake_ga(Dimension, N, SelectionWeight, SurvivalRate, MutationRate, Snake) :-
+long_snake_ga(Dimension, N, SelectionBias, SurvivalRate, MutationRate, Snake) :-
 	format('long_snake_ga: genetic algorithm search\n', []),
 	format('dimension: ~w\n', [Dimension]),
-	format('selection weight: ~w\n', [SelectionWeight]),
+	format('selection bias: ~w\n', [SelectionBias]),
 	format('survival rate: ~w\n', [SurvivalRate]),
 	format('mutation rate: ~w\n', [MutationRate]),
 	ga_random_population(Dimension, SurvivalRate, Population),
-	long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, MutationRate, Snake).
+	long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRate, Snake).
 
 long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
 	statistics(real_time, _),
@@ -529,21 +543,23 @@ long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
 	transition_list(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
 	ga_fitness(Dimension, BestTransitions, BestFitness),
+	ga_selection_state(_, _, LastSelectionBias),
 	length(PopulationSort, PopSize),
 	length(Best, BestLength),
 	format('generation 0:\n', []),
 	format('  time = ~ws\n', [TimeTaken]),
 	format('  population size = ~w\n', [PopSize]),
+	format('  selection bias = ~w\n', [LastSelectionBias]),
 	format('  best snake = ~w\n', [Best]),
 	format('  length (nodes) = ~w\n', [BestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 	format('DONE\n'),
 	!.
 
-long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, MutationRate, Best) :-
+long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRate, Best) :-
 	statistics(real_time, _),
 	mergesort(Population, descending(ga_fitness(Dimension)), SortedPopulation),
-	SortedPopulation = [CurrentBest|Rest],
+	SortedPopulation = [CurrentBest|_],
 	statistics(real_time, [_, TimeTaken]),
 
 	ga_cleanup_auto,
@@ -551,21 +567,23 @@ long_snake_ga_(Dimension, Population, N, SelectionWeight, SurvivalRate, Mutation
 	transition_list(CurrentBestPath, CurrentBest),
 	prune(Dimension, CurrentBestPath, CurrentBestSnake),
 	ga_fitness(Dimension, CurrentBest, BestFitness),
+	ga_selection_state(_, _, LastSelectionBias),
 	length(SortedPopulation, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
 	format('generation ~w:\n', [N]),
 	format('  time = ~ws\n', [TimeTaken]),
 	format('  population size = ~w\n', [PopSize]),
+	format('  selection bias = ~w\n', [LastSelectionBias]),
 	format('  best snake = ~w\n', [CurrentBestSnake]),
 	format('  length (nodes) = ~w\n', [CurrentBestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 
-	ga_select_n(2, SelectionWeight, [A,B], Rest, _),
+	ga_select_n(3, SelectionBias, [A,B,C], SortedPopulation, _),
 	ga_random_path(Dimension, Random),
-	ga_breed_population(Dimension, [CurrentBest,A,B,Random], SurvivalRate, MutationRate, NextPopulation),
+	ga_breed_population(Dimension, [A,B,C,Random], SurvivalRate, MutationRate, NextPopulation),
 	N1 is N + 1,
 	!,
-	long_snake_ga_(Dimension, [CurrentBest|NextPopulation], N1, SelectionWeight, SurvivalRate, MutationRate, Best).
+	long_snake_ga_(Dimension, [CurrentBest|NextPopulation], N1, SelectionBias, SurvivalRate, MutationRate, Best).
 
 
 % Experiments
@@ -618,7 +636,8 @@ selection_weight_test :-
 
 	write('-----\n'),
 
-	Trials = [0.01, 0.02, 0.03, 0.1, 0.2, 0.3, 1],
+	findall(X, (between(1, 10, Y), (X is Y/10 ; X is Y/100 ; X is Y/1000)), Trials),
+	% Trials = [0.01, 0.02, 0.03, 0.1, 0.2, 0.3, 1],
 
 	forall( member(Weight, Trials), (
 		format('weight: ~w\n', [Weight]),
@@ -648,9 +667,9 @@ main :-
 
 	% During mate selection, we use a modified roulette select. This determines
 	% how strongly better solutions should be favored. Higher values quickly
-	% reduse the set of likely candidates. A value of 'auto' will select the
-	% first quartile with a standard deviation of 1/4 of the population.
-	SelectionWeight = auto,
+	% reduse the set of likely candidates. A value of 'auto' will enable
+	% dynamic selection bias.
+	SelectionBias = auto,
 
 	% When breading, not all possible children are returned. Some children "die"
 	% before becoming productive. This determines how many children survive.
@@ -662,4 +681,4 @@ main :-
 	% a 1% chance to mutate twice, a 0.1% chance to mutate 3 times, etc.
 	MutationRate = 0.1,
 
-	long_snake_ga(Dimension, 1, SelectionWeight, SurvivalRate, MutationRate, _).
+	long_snake_ga(Dimension, 1, SelectionBias, SurvivalRate, MutationRate, _).
