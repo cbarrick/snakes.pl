@@ -23,17 +23,21 @@
 %
 % Implemented as concurrent quicksort; mergesort appears to be faster.
 
-quicksort([], _, []) :- !.
-
 quicksort(List, Comparator, Sorted) :-
 	sort(List, CleanList), % remove duplicates
-	CleanList = [Pivot|Unsorted],
-	quicksort_([Pivot|Unsorted], [], [], Comparator, Sorted).
+	quicksort_(CleanList, Comparator, Sorted).
 
-quicksort_([Pivot], Before, After, Comparator, Sorted) :-
+quicksort_([], _, []) :- !.
+
+quicksort_(List, Comparator, Sorted) :-
+	random_select(Pivot, List, Unsorted),
+	quicksort_partition([Pivot|Unsorted], [], [], Comparator, Sorted).
+
+quicksort_partition([Pivot], Before, After, Comparator, Sorted) :-
+	!,
 	thread_create(
 		(
-			quicksort(Before, Comparator, SortedBefore),
+			quicksort_(Before, Comparator, SortedBefore),
 			thread_exit(SortedBefore)
 		),
 		BeforeThread,
@@ -41,7 +45,7 @@ quicksort_([Pivot], Before, After, Comparator, Sorted) :-
 	),
 	thread_create(
 		(
-			quicksort(After, Comparator, SortedAfter),
+			quicksort_(After, Comparator, SortedAfter),
 			thread_exit(SortedAfter)
 		),
 		AfterThread,
@@ -49,19 +53,20 @@ quicksort_([Pivot], Before, After, Comparator, Sorted) :-
 	),
 	thread_join(BeforeThread, exited(SortedBefore)),
 	thread_join(AfterThread, exited(SortedAfter)),
-	append([SortedBefore, [Pivot], SortedAfter], Sorted),
-	!.
+	append([SortedBefore, [Pivot], SortedAfter], Sorted).
 
 
-quicksort_([Pivot,Next|Unsorted], Before, After, Comparator, Sorted) :-
-	call(Comparator, Pivot, Next, Next),
+quicksort_partition([Pivot,Next|Unsorted], Before, After, Comparator, Sorted) :-
+	call(Comparator, Pivot, Next, Pick),
+	( Pick = Next ->
+		NextBefore = [Next|Before],
+		NextAfter = After
+	;
+		NextBefore = Before,
+		NextAfter = [Next|After]
+	),
 	!,
-	quicksort_([Pivot|Unsorted], [Next|Before], After, Comparator, Sorted).
-
-quicksort_([Pivot,Next|Unsorted], Before, After, Comparator, Sorted) :-
-	call(Comparator, Pivot, Next, Pivot),
-	!,
-	quicksort_([Pivot|Unsorted], Before, [Next|After], Comparator, Sorted).
+	quicksort_partition([Pivot|Unsorted], NextBefore, NextAfter, Comparator, Sorted).
 
 
 %% mergesort(+List, +Comparator, -Sorted)
@@ -72,19 +77,22 @@ quicksort_([Pivot,Next|Unsorted], Before, After, Comparator, Sorted) :-
 %
 % Implemented as concurrent mergesort; this appears to be faster than quicksort.
 
-mergesort([], _, []) :- !.
-mergesort([X], _, [X]) :- !.
-
-mergesort(List, Comp, Sorted) :-
+mergesort(List, Comparator, Sorted) :-
 	sort(List, CleanList), % remove duplicates.
-	length(CleanList, L),
+	mergesort_(CleanList, Comparator, Sorted).
+
+mergesort_([], _, []) :- !.
+mergesort_([X], _, [X]) :- !.
+
+mergesort_(List, Comparator, Sorted) :-
+	length(List, L),
 	Half is L // 2,
 	length(Front, Half),
-	append(Front, Back, CleanList),
+	append(Front, Back, List),
 
 	thread_create(
 		(
-			mergesort(Front, Comp, SortedFront),
+			mergesort_(Front, Comparator, SortedFront),
 			thread_exit(SortedFront)
 		),
 		FrontThread,
@@ -92,7 +100,7 @@ mergesort(List, Comp, Sorted) :-
 	),
 	thread_create(
 		(
-			mergesort(Back, Comp, SortedBack),
+			mergesort_(Back, Comparator, SortedBack),
 			thread_exit(SortedBack)
 		),
 		BackThread,
@@ -101,22 +109,22 @@ mergesort(List, Comp, Sorted) :-
 	thread_join(FrontThread, exited(SortedFront)),
 	thread_join(BackThread, exited(SortedBack)),
 
-	merge(SortedFront, SortedBack, Comp, Sorted).
+	merge(SortedFront, SortedBack, Comparator, Sorted).
 
 merge([], Ys, _, Ys) :- !.
 merge(Xs, [], _, Xs) :- !.
 
-merge([X|XT], [Y|YT], Comp, Merged) :-
-	call(Comp, X, Y, X),
+merge([X|XT], [Y|YT], Comparator, Merged) :-
+	call(Comparator, X, Y, X),
 	!,
 	Merged = [X|Rest],
-	merge(XT, [Y|YT], Comp, Rest).
+	merge(XT, [Y|YT], Comparator, Rest).
 
-merge([X|XT], [Y|YT], Comp, Merged) :-
-	call(Comp, X, Y, Y),
+merge([X|XT], [Y|YT], Comparator, Merged) :-
+	call(Comparator, X, Y, Y),
 	!,
 	Merged = [Y|Rest],
-	merge([X|XT], YT, Comp, Rest).
+	merge([X|XT], YT, Comparator, Rest).
 
 
 %% ascending(+A, +B, -C), ascending(+Evaluator, +A, +B, -C)
