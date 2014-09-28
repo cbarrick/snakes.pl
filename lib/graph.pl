@@ -7,6 +7,7 @@
 	available/3,    % available(+Dimension, +Snake, ?Node)
 	reachable/3,    % reachable(+Dimension, +Snake, ?Node)
 	snake/2,        % snake(+Dimension, ?Snake)
+	skin_density/4, % skin_density(+Dimension, +Path, +Node, -Density)
 	prune/3         % prune(+Dimension, +Path, -Snake)
 
 ]).
@@ -116,6 +117,20 @@ snake(Dimension, Snake) :-
 
 	\+ snake_memo(Dimension, Snake),
 	assertz( snake_memo(Dimension, Snake) ).
+
+
+%% skin_density(+Dimension, +Path, +Node, -Density)
+% Calculate the skin density of a Node with a given Path. The skin density is
+% the number of nodes in the path to which the Node is adjacent. Nodes on the
+% path have a skin density of 0.
+
+skin_density(Dimension, Path, Node, Density) :-
+	\+ member(Node, Path),
+	findall(X, (edge(Dimension, Node, X), member(X, Path)), Xs),
+	length(Xs, Density),
+	!.
+
+skin_density(_, _, _, 0).
 
 
 %% prune(+Dimension, ?Path, ?Snake)

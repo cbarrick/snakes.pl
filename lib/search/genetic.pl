@@ -212,10 +212,21 @@ fitness(Dimension, Transitions, Fitness) :-
 fitness(Dimension, Transitions, Fitness) :-
 	transitions(Path, Transitions),
 	prune(Dimension, Path, Snake),
+	length(Snake, Length),
+
 	findall(Node, available(Dimension, Snake, Node), Available),
-	length(Snake, X),
-	length(Available, Y),
-	Fitness is (Dimension * X) + Y,
+	length(Available, NAvailable),
+
+	findall(Node, reachable(Dimension, Snake, Node), Reachable),
+	length(Reachable, NReachable),
+
+	findall(D, (node(Dimension, Node), skin_density(Dimension, Snake, Node, D)), Densities),
+	sum_list(Densities, Density),
+
+	% Fitness is Length,
+	% Fitness is (Dimension * Length) + NAvailable,
+	Fitness is Length - (NAvailable - NReachable) + Density,
+
 	asserta(fitness_memo(Dimension, Transitions, Fitness)).
 
 
