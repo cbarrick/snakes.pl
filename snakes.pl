@@ -125,11 +125,16 @@ main :-
 	% The longest snake in 7D is 51 nodes.
 	Dimension = 7,
 
-	% During mate selection, we use a modified roulette select. This determines
-	% how strongly better solutions should be favored. Higher values quickly
-	% reduse the set of likely candidates. A value of 'auto' will enable
-	% dynamic selection bias.
-	SelectionBias = auto,
+	% We use a biased selection for mates. This value determines how strongly
+	% better solutions should be favored. Higher values quickly reduse the set
+	% of likely candidates. The bias can be expressed in one of three ways:
+	%    1. A probability (absolute static bias)
+	%    2. A term of the form `A/B` (relative static bias)
+	%    3. A term of the form `lambda(Var, Expression)` (absolute dynamic bias)
+	% See `genetic:biased_mate_select/5` for more details
+	SelectionBias = lambda(X, 0.1 - 0.005 * X),
+	% Note: in rudementry testing on dimension 5, the relative static bias of
+	% 1/4 seems to do better than the dynamic bias X->0.1-0.005*X
 
 	% When breading, not all possible children are returned. Some children "die"
 	% before becoming productive. This determines how many children survive.

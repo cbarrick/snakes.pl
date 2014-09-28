@@ -9,12 +9,8 @@
 
 
 %% biased_select(+Bias, -X, +List, -Rest)
-%
-
-biased_select(A/B, X, List, Rest) :-
-	length(List, L),
-	Bias is A / (L / B),
-	biased_select(Bias, X, List, Rest).
+% Randomly select an element X from the List with a Bias for elements closer
+% to the head of the List. Bias is a value between 0.0 and 1.0.
 
 biased_select(Bias, X, List, Rest) :-
 	select(X, List, Rest),
@@ -25,33 +21,77 @@ biased_select(_, X, List, Rest) :-
 	random_select(X, List, Rest).
 
 
-%% biased_mate_select(+N, +Bias, -Selection, +List, -Rest)
-%
+%% biased_mate_select(+N, +Bias, -Selection, +Population, -Rest)
+% Randomly select N members of the Population with a Bias for individuals
+% closer to the head of the Population. Bias may take one of three forms:
+%    1. A probability:
+%        - Mate selection works by first trying to select the most fit
+%          individual with some probability of success. If this fails, it
+%          trys the next most fit, and so on unitl a mate is selected. A
+%          value of 1 will always select the most fit as mates, while a
+%          value of 0 will force random selection.
+%    2. A term of the form A/B:
+%        - An interesting property of this selection strategy is that the
+%          mean of the selected indicies will also be the standard
+%          deviation. Using this form, we can calculate the desired mean
+%          as a porportion of the population size. I.E. a value of 1/4
+%          will target the first quartile of the population, and the top
+%          half of the population will all lie within one standard
+%          deviation of the expected mate.
+%    3. A term of the form lambda(Var, Expression):
+%        - A static bias may not always be ideal. It may be better to
+%          dynamically weaken the bias as the results converge. Using this
+%          form, we can provide a formula in terms of Var as an Expression.
+%          During mate selection, we call this expression to determine the
+%          bias with Var bound to the number of generations that the same
+%          individual has been the most fit. In most cases, this should be
+%          a decreasing function.
 
 :- dynamic(ga_selection_state/3).
-ga_selection_state(n/a, n/a, 0.1).
+ga_selection_state(n/a, n/a, n/a).
 
-biased_mate_select(0, _, [], List, List) :- !.
+% dynamic absolute bias
+biased_mate_select(N, lambda(Var, Expr), Selection, Population, Rest) :-
+	Population = [Best|_],
+	ga_selection_state(OldBest, OldState, _),
 
-biased_mate_select(N, auto, Selection, List, Rest) :-
-	List = [Best|_],
-	retract(ga_selection_state(OldBest, OldState, _)),
 	( Best = OldBest ->
-		State is OldState + 1,
-		Bias is max(0, 0.1 - 0.005 * State)
+		copy_term(lambda(Var, Expr), lambda(Var_, Expr_)),
+		Var_ is OldState + 1,
+		Bias is max(0, Expr_)
 	;
-		State = 0,
 		Bias is 0.1
 	),
-	asserta(ga_selection_state(Best, State, Bias)),
-	!,
-	biased_mate_select(N, Bias, Selection, List, Rest).
 
-biased_mate_select(N, Bias, Selection, List, Rest) :-
+	!,
+	biased_mate_select(N, Bias, Selection, Population, Rest).
+
+% static relative bias
+biased_mate_select(N, A/B, Selection, Population, Rest) :-
+	length(Population, L),
+	Bias is A / (L / B),
+	!,
+	biased_mate_select(N, Bias, Selection, Population, Rest).
+
+% static absolute bias
+% also handles updating state
+biased_mate_select(N, Bias, Selection, Population, Rest) :-
+	Population = [Best|_],
+	retract(ga_selection_state(OldBest, OldState, _)),
+	( Best = OldBest ->
+		State is OldState + 1
+	;
+		State is 0
+	),
+	asserta(ga_selection_state(Best, State, Bias)),
+	biased_mate_select_(N, Bias, Selection, Population, Rest).
+
+biased_mate_select_(0, _, [], Population, Population) :- !.
+biased_mate_select_(N, Bias, Selection, Population, Rest) :-
 	Selection = [H|T],
-	biased_select(Bias, H, List, Rest_),
+	biased_select(Bias, H, Population, Rest_),
 	N0 is N - 1,
-	biased_mate_select(N0, Bias, T, Rest_, Rest).
+	biased_mate_select_(N0, Bias, T, Rest_, Rest).
 
 
 %% mutate(+Dimension, +Probability, +Original, -Mutant)
