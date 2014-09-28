@@ -48,7 +48,7 @@ biased_select(_, X, List, Rest) :-
 %          a decreasing function.
 
 :- dynamic(ga_selection_state/3).
-ga_selection_state(n/a, n/a, n/a).
+ga_selection_state(n/a, n/a, 0).
 
 % dynamic absolute bias
 biased_mate_select(N, lambda(Var, Expr), Selection, Population, Rest) :-
@@ -255,18 +255,18 @@ cleanup_auto :-
 
 long_snake(Dimension, N, SelectionBias, SurvivalRate, MutationRate, Snake) :-
 	format('genetic algorithm search\n', []),
-	format('dimension: ~w\n', [Dimension]),
-	format('selection bias: ~w\n', [SelectionBias]),
-	format('survival rate: ~w\n', [SurvivalRate]),
-	format('mutation rate: ~w\n', [MutationRate]),
+	format('dimension = ~w\n', [Dimension]),
+	format('selection bias = ~w\n', [SelectionBias]),
+	format('survival rate = ~w\n', [SurvivalRate]),
+	format('mutation rate = ~w\n', [MutationRate]),
 	random_population(Dimension, SurvivalRate, Population),
 	long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRate, Snake).
 
 long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
-	statistics(real_time, _),
+	statistics(walltime, _),
 	mergesort(Population, descending(fitness(Dimension)), PopulationSort),
 	PopulationSort = [BestTransitions|_],
-	statistics(real_time, [_, TimeTaken]),
+	statistics(walltime, [_, TimeTaken]),
 
 	transitions(BestPath, BestTransitions),
 	prune(Dimension, BestPath, Best),
@@ -275,20 +275,20 @@ long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
 	length(PopulationSort, PopSize),
 	length(Best, BestLength),
 	format('generation 0:\n', []),
-	format('  time = ~ws\n', [TimeTaken]),
-	format('  population size = ~w\n', [PopSize]),
-	format('  selection bias = ~w\n', [LastSelectionBias]),
+	format('  time = ~0fms\n', [TimeTaken]),
+	format('  population size = ~d\n', [PopSize]),
+	format('  selection bias = ~5f\n', [LastSelectionBias]),
 	format('  best snake = ~w\n', [Best]),
-	format('  length (nodes) = ~w\n', [BestLength]),
+	format('  length (nodes) = ~d\n', [BestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 	format('DONE\n'),
 	!.
 
 long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRate, Best) :-
-	statistics(real_time, _),
+	statistics(walltime, _),
 	mergesort(Population, descending(fitness(Dimension)), SortedPopulation),
 	SortedPopulation = [CurrentBest|_],
-	statistics(real_time, [_, TimeTaken]),
+	statistics(walltime, [_, TimeTaken]),
 
 	cleanup_auto,
 
@@ -299,11 +299,11 @@ long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRa
 	length(SortedPopulation, PopSize),
 	length(CurrentBestSnake, CurrentBestLength),
 	format('generation ~w:\n', [N]),
-	format('  time = ~ws\n', [TimeTaken]),
-	format('  population size = ~w\n', [PopSize]),
-	format('  selection bias = ~w\n', [LastSelectionBias]),
-	format('  best snake = ~w\n', [CurrentBestSnake]),
-	format('  length (nodes) = ~w\n', [CurrentBestLength]),
+	format('  time = ~0fms\n', [TimeTaken]),
+	format('  population size = ~d\n', [PopSize]),
+	format('  selection bias = ~5f\n', [LastSelectionBias]),
+	format('  best snake = ~w\n', [CurrentBest]),
+	format('  length (nodes) = ~d\n', [CurrentBestLength]),
 	format('  fitness = ~w\n', [BestFitness]),
 
 	biased_mate_select(3, SelectionBias, [A,B,C], SortedPopulation, _),
