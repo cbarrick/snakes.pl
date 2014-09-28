@@ -52,35 +52,34 @@
 % An experiment on sorting algorithms
 % Results: Mergesort is faster
 sorting_test :-
-	D = 6,
-	genetic:random_population(D, 1, Pop),
-	length(Pop, N),
+	Dimension = 5,
+	Trials = 10, % the test is not tail recursive, don't make this too big
+	format('Sorting ~d random populations in dimension ~d\n', [Trials, Dimension]),
+	sorting_test_(Dimension, Trials, QuickTime, MergeTime),
+	MeanQuickTime is QuickTime / Trials,
+	MeanMergeTime is MergeTime / Trials,
+	format('quicksort: ~0fms\n', [MeanQuickTime]),
+	format('mergesort: ~0fms\n', [MeanMergeTime]).
 
-	format('Sorting ~w random paths in dimension ~w\n', [N, D]),
+sorting_test_(_, 0, 0, 0) :- !.
+sorting_test_(Dimension, Trials, QuickTime, MergeTime) :-
+	!,
+	genetic:random_population(Dimension, 1, Pop),
 
-	format('\nquicksort:\n'),
 	genetic:cleanup,
-	time(quicksort(Pop, descending(genetic:fitness(D)), Sorted1)),
+	statistics(walltime, _),
+	quicksort(Pop, descending(genetic:fitness(Dimension)), _),
+	statistics(walltime, [_, ThisQuickTime]),
 
-	format('\nmergesort\n'),
 	genetic:cleanup,
-	time(mergesort(Pop, descending(genetic:fitness(D)), Sorted2)),
+	statistics(walltime, _),
+	mergesort(Pop, descending(genetic:fitness(Dimension)), _),
+	statistics(walltime, [_, ThisMergeTime]),
 
-	% Check that the lists are equivalent
-	% The sorted lists may not be in the same order given that some paths
-	% have the same fitness. So we must check against the fitness of the
-	% paths in the lists.
-	findall(X, (
-		member(A, Sorted1),
-		genetic:fitness(D, A, X)
-	), Xs),
-	findall(Y, (
-		member(A, Sorted2),
-		genetic:fitness(D, A, Y)
-	), Ys),
-	format('~w\n', Xs),
-	format('~w\n', Ys),
-	Xs = Ys.
+	NextTrials is Trials - 1,
+	sorting_test_(Dimension, NextTrials, NextQuickTime, NextMergeTime),
+	QuickTime is NextQuickTime + ThisQuickTime,
+	MergeTime is NextMergeTime + ThisMergeTime.
 
 
 % An experiment on selection weights
