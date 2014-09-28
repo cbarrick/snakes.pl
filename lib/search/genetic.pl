@@ -220,13 +220,14 @@ fitness(Dimension, Transitions, Fitness) :-
 
 
 %% cleanup, cleanup_auto
-% Cleans up the memos left by the `fitness/3` and `snake/2` predicates.
+% Cleans memos left by this module. This predicate is not explicitly exported.
+% To call it, you must provide the module, i.e. `?- genetic:cleanup.`
 % The "auto" version only cleans up every 10th time that it is called.
 
 cleanup :-
 	flag('cleanup_auto last_cleanup', _, 0),
 	retractall(fitness_memo(_,_,_)),
-	retractall(snake_memo(_,_)).
+	graph:cleanup.
 
 cleanup_auto :-
 	flag('cleanup_auto last_cleanup', N, N+1),

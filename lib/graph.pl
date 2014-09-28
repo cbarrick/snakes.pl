@@ -126,3 +126,11 @@ prune(Dimension, Path, Path) :- snake(Dimension, Path), !.
 prune(Dimension, Path, Snake) :-
 	Path = [_|T],
 	prune(Dimension, T, Snake).
+
+
+%% cleanup
+% Cleans memos left by this module. This predicate is not explicitly exported.
+% To call it, you must provide the module, i.e. `?- graph:cleanup.`
+
+cleanup :-
+	retractall(graph:snake_memo(_,_)).
