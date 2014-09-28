@@ -48,21 +48,14 @@ biased_select(_, X, List, Rest) :-
 %          a decreasing function.
 
 :- dynamic(ga_selection_state/3).
-ga_selection_state(n/a, n/a, 0).
+ga_selection_state([], 0, 0).
 
 % dynamic absolute bias
 biased_mate_select(N, lambda(Var, Expr), Selection, Population, Rest) :-
-	Population = [Best|_],
-	ga_selection_state(OldBest, OldState, _),
-
-	( Best = OldBest ->
-		copy_term(lambda(Var, Expr), lambda(Var_, Expr_)),
-		Var_ is OldState + 1,
-		Bias is max(0, Expr_)
-	;
-		Bias is 0.1
-	),
-
+	ga_selection_state(_, PrevState, _),
+	copy_term(lambda(Var, Expr), lambda(Var_, Expr_)),
+	Var_ is PrevState,
+	Bias is max(0, Expr_),
 	!,
 	biased_mate_select(N, Bias, Selection, Population, Rest).
 
