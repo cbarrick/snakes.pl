@@ -121,19 +121,21 @@ selection_bias_test :-
 % This will run indefinitly, printing results after each generation
 main :-
 
+	% As a reference point, a population in dimension 7 with a survival rate
+	% of 0.75 has about 400 individuals. For that population, a selection bias
+	% of 1/4 works out to about 0.009
+
 	% The longest snake in 7D is 51 nodes.
 	Dimension = 7,
 
 	% We use a biased selection for mates. This value determines how strongly
 	% better solutions should be favored. Higher values quickly reduse the set
 	% of likely candidates. The bias can be expressed in one of three ways:
-	%    1. A probability (absolute static bias)
-	%    2. A term of the form `A/B` (relative static bias)
-	%    3. A term of the form `lambda(Var, Expression)` (absolute dynamic bias)
+	%    1. A probability (static absolute bias)
+	%    2. A term of the form `A/B` (static relative bias)
+	%    3. A term of the form `lambda(Var, Expression)` (dynamic absolute bias)
 	% See `genetic:biased_mate_select/5` for more details
-	SelectionBias = lambda(X, 0.1 - 0.005 * X),
-	% Note: in rudementry testing on dimension 5, the relative static bias of
-	% 1/4 seems to do better than the dynamic bias X->0.1-0.005*X
+	SelectionBias = lambda(X, 0.01 - 0.00025 * X),
 
 	% When breading, not all possible children are returned. Some children "die"
 	% before becoming productive. This determines how many children survive.
