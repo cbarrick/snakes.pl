@@ -244,28 +244,6 @@ long_snake(Dimension, N, SelectionBias, SurvivalRate, MutationRate, Snake) :-
 	random_population(Dimension, SurvivalRate, Population),
 	long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRate, Snake).
 
-long_snake_ga_(Dimension, Population, 0, _, _, _, Best) :-
-	statistics(walltime, _),
-	mergesort(Population, descending(fitness(Dimension)), PopulationSort),
-	PopulationSort = [BestTransitions|_],
-	statistics(walltime, [_, TimeTaken]),
-
-	transitions(BestPath, BestTransitions),
-	prune(Dimension, BestPath, Best),
-	fitness(Dimension, BestTransitions, BestFitness),
-	ga_selection_state(_, _, LastSelectionBias),
-	length(PopulationSort, PopSize),
-	length(Best, BestLength),
-	format('generation 0:\n', []),
-	format('  time = ~0fms\n', [TimeTaken]),
-	format('  population size = ~d\n', [PopSize]),
-	format('  selection bias = ~5f\n', [LastSelectionBias]),
-	format('  best snake = ~w\n', [Best]),
-	format('  length (nodes) = ~d\n', [BestLength]),
-	format('  fitness = ~w\n', [BestFitness]),
-	format('DONE\n'),
-	!.
-
 long_snake_ga_(Dimension, Population, N, SelectionBias, SurvivalRate, MutationRate, Best) :-
 	statistics(walltime, _),
 	mergesort(Population, descending(fitness(Dimension)), SortedPopulation),
