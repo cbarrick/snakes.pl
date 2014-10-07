@@ -10,10 +10,10 @@
 	skin_density/4,
 	fitness/3,
 	random_population/3,
-	grow/3,
-	grow_population/4,
+	pad/3,
+	grow_population/3,
 	grow_initial_population/4,
-	xor_mutant/3,
+	xor_mutant/2,
 	cleanup/0,
 	cleanup_auto/1
 
@@ -145,57 +145,50 @@ fitness(D, Path, Fitness) :-
 
 
 %% random_population(+D, +Size, -Population)
-%
+% DEPRECATED: Use grow_initial_population/4
 
 random_population(_, 0, []) :- !.
 
-random_population(D, Size, [H|Population]) :-
-	PathSize is ceiling(0.4 * 2^D),
-	length(H, PathSize),
-	length([H|Population], Size),
-	grow(D, [0], H_),
-	append(_, H, H_),
-	S0 is Size - 1,
-	!,
-	random_population(D, S0, Population).
-
-% If the grow operation somehow ends before we reach the desired length,
-% we need to retry
-random_population(D, S, P) :- random_population(D, S, P).
+random_population(D, Size, Population) :-
+	grow_initial_population(D, Size, [0], Population).
 
 
-%% grow(+D, +Seed, -Path)
+%% pad(+D, +Seed, -Path)
 %
 
-grow(D, [H|Seed], Path) :-
+pad(D, [H|Seed], Path) :-
+	length(Seed, L),
+	MaxLength is ceiling(0.4 * 2 ^ D),
+	L < MaxLength,
 	findall(N, (
 		edge(D, H, N),
 		\+ member(N, Seed)
 	), NextNodes),
 	random_select(Next, NextNodes, _),
 	!,
-	grow(D, [Next,H|Seed], Path).
+	pad(D, [Next,H|Seed], Path).
 
-grow(_, Seed, Seed).
+pad(_, Seed, Seed).
 
 
-%% grow_population(+D, +Iterations, +Population, -Children)
+%% grow_population(+D, +Population, -Children)
 %
 
-grow_population(D, 1, Population, Children) :-
-	findall(Child, (
-		member(Parent, Population),
-		snake(D, Parent, ParentSnake),
-		grow(D, ParentSnake, Child)
-	), Children),
-	!.
+grow_population(_, [], []) :- !.
 
-grow_population(D, Iterations, Population, Children) :-
-	grow_population(D, 1, Population, C0),
-	append(C0, C1, Children),
-	I0 is Iterations - 1,
-	!,
-	grow_population(D, I0, Population, C1).
+grow_population(D, [X|Population], [Child|Children]) :-
+	snake(D, X, [H|T]),
+	findall(Node, (
+		edge(D, Node, H),
+		snake(D, [Node,H|T])
+	), Nodes),
+	(
+		random_select(Node, Nodes, _),
+		pad(D, [Node,H|T], Child),
+		grow_population(D, Population, Children)
+	;
+		grow_population(D, Population, [Child|Children])
+	).
 
 
 %% grow_initial_population(+D, +Size, +Seed, -Population)
@@ -205,33 +198,17 @@ grow_initial_population(D, Size, Seed, Population) :-
 	length(Population, Size),
 	findall(X, (
 		member(X, Population),
-		grow(D, Seed, X)
+		pad(D, Seed, X)
 	), Population).
 
-%% xor_mutant(D, +Original, -Mutant) [nondet]
+%% xor_mutant(+Original, -Mutant) [nondet]
 %
 
-xor_mutant(D, Original, Mutant) :-
-	snake(D, Original),
-	Original = [A,B|Back],
-	edge(D, B, X),
-	X \= A,
-	Mutant = [X,B|Back].
-
-xor_mutant(D, Original, Mutant) :-
-	snake(D, Original),
+xor_mutant(Original, Mutant) :-
 	append([Front, [A,B,C], Back], Original),
 	X is A xor C,
 	Y is B xor X,
 	append([Front, [A,Y,C], Back], Mutant).
-
-xor_mutant(D, Original, Mutant) :-
-	snake(D, Original, Snake),
-	append([Front, [_,_], Snake], Original),
-	append([Front, Front_, [A,B,C], Back], Original),
-	X is A xor C,
-	Y is B xor X,
-	append([Front, Front_, [A,Y,C], Back], Mutant).
 
 
 %% cleanup / cleanup_auto(+Freq)

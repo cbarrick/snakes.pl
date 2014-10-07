@@ -100,7 +100,7 @@ rank_select_(0, _, []) :- !.
 
 rank_select_(N, Population, [H|Parents]) :-
 	length(Population, L),
-	Bias is (L+1)/((1/2)*(L)*(L+1)),
+	Bias is L/((1/2)*(L)*(L+1)),
 	biased_select(Bias, H, Population, Rest),
 	N0 is N-1,
 	rank_select_(N0, Rest, Parents).
@@ -151,10 +151,12 @@ random_npoint_crossover_(N, Mother, Father, Child) :-
 hillclimber(Mutation, Fitness, Individual, BestMutant) :-
 	debug(hillclimber, 'mutating ~w', [Individual]),
 	call(Fitness, Individual, BaseFitness),
-	findall(Mutant, call(Mutation, Individual, Mutant), MutationPool),
+	findall(Mutant, (
+		call(Mutation, Individual, Mutant),
+		call(Fitness, Mutant, MutantFitness),
+		MutantFitness > BaseFitness
+	), MutationPool),
 	mergesort(MutationPool, descending(Fitness), [CurrentBestMutant|_]),
-	call(Fitness, CurrentBestMutant, MutantFitness),
-	MutantFitness > BaseFitness,
 	hillclimber(Mutation, Fitness, CurrentBestMutant, BestMutant).
 
 hillclimber(_, _, X, X) :-

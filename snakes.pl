@@ -109,7 +109,7 @@ sorting_test_(Dimension, Trials, QuickTime, MergeTime) :-
 % This will run indefinitly, printing results after each generation
 main :-
 
-	% debug(genetic_search),
+	debug(genetic_search),
 	% debug(hillclimber),
 	% debug(mergesort),
 
@@ -119,9 +119,8 @@ main :-
 
 	Fitness = fitness(Dimension),
 	Select = rank_select(80),
-	% Reproduce = grow_population(Dimension, 4),
-	Reproduce = random_npoint_crossover(80, 1),
-	Mutate = population_hillclimber(xor_mutant(Dimension)),
+	Reproduce = grow_population(Dimension),
+	Mutate = population_hillclimber(xor_mutant),
 	Terminate = terminate(Dimension),
 
 	random_population(Dimension, PopulationSize, InitialPopulation),
