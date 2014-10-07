@@ -35,15 +35,38 @@
 :- module(snakes, [
 
 	sorting_test/0,
-	selection_bias_test/0,
 	main/0
 
 ]).
 
-:- use_module('lib/graph').
+:- use_module('lib/graph2').
 :- use_module('lib/sort').
-:- use_module('lib/search/naive').
 :- use_module('lib/search/genetic').
+
+
+% This predicate is the logger/terminating condition for the GA
+% When it succeeds, the GA stops
+terminate(Dimension, N, Population, Soln) :-
+	sort(Population, SortedPopulation), % remove dupes
+
+	mergesort(SortedPopulation, descending(fitness(Dimension)), [Best|_]),
+	snake(Dimension, Best, BestSnake),
+	length(BestSnake, L),
+	L0 is L-1,
+
+	length(SortedPopulation, PopSize),
+
+	statistics(walltime, [_, MilliTime]),
+	Time is MilliTime / 1000,
+
+	format('~w,~w,~w,~w\n', [N,Time,PopSize,L0]),
+	cleanup_auto(10),
+
+	!,
+
+	% Stop when the population becomes small
+	PopSize =< 8,
+	Soln = BestSnake.
 
 
 % Experiments
@@ -82,69 +105,26 @@ sorting_test_(Dimension, Trials, QuickTime, MergeTime) :-
 	MergeTime is NextMergeTime + ThisMergeTime.
 
 
-% An experiment on selection weights
-% Results: The weight 1/n will select the nth element on average
-% with a standard deviation of n.
-selection_bias_test :-
-	findall(P, between(1, 1000, P), Population),
-	length(Population, PopulationSize),
-	format('population size: ~w\n', [PopulationSize]),
-
-	TrialSize = 1000,
-	format('trail size: ~w\n', [TrialSize]),
-
-	write('-----\n'),
-
-	findall(X, (between(1, 10, Y), (X is Y/10 ; X is Y/100 ; X is Y/1000)), Trials),
-	% Trials = [0.01, 0.02, 0.03, 0.1, 0.2, 0.3, 1],
-
-	forall( member(Bias, Trials), (
-		format('weight: ~w\n', [Bias]),
-
-		findall(S, (
-			between(1, TrialSize, _),
-			genetic:biased_select(Bias, S, Population, _)
-		), Ss ),
-
-		sum_list(Ss, Sum),
-		Mean is Sum / TrialSize,
-		format('  mean: ~w\n', [Mean]),
-
-		findall(X, (member(X_, Ss), X is (X_ - Mean) ^ 2), Xs),
-		sum_list(Xs, Y),
-		StandardDeviation is sqrt(Y / TrialSize),
-		format('  standard deviation: ~w\n', [StandardDeviation])
-	)).
-
-
 % Find the longest snake in 7D using the GA
 % This will run indefinitly, printing results after each generation
 main :-
 
-	% As a reference point, a population in dimension 7 with a survival rate
-	% of 0.75 has about 400 individuals. For that population, a selection bias
-	% of 1/4 works out to about 0.009
+	% debug(genetic_search),
+	% debug(hillclimber),
+	% debug(mergesort),
 
-	% The longest snake in 7D is 51 nodes.
-	Dimension = 7,
+	Dimension = 8,
 
-	% We use a biased selection for mates. This value determines how strongly
-	% better solutions should be favored. Higher values quickly reduse the set
-	% of likely candidates. The bias can be expressed in one of three ways:
-	%    1. A probability (static absolute bias)
-	%    2. A term of the form `A/B` (static relative bias)
-	%    3. A term of the form `lambda(Var, Expression)` (dynamic absolute bias)
-	% See `genetic:biased_mate_select/5` for more details
-	SelectionBias = lambda(X, 0.01 - 0.00025 * X),
+	PopulationSize = 100,
 
-	% When breading, not all possible children are returned. Some children "die"
-	% before becoming productive. This determines how many children survive.
-	% Lower rates mean each generation is faster, higher rates mean each
-	% generation is better. The goal is to optimize execution speed.
-	SurvivalRate = 0.75,
+	Fitness = fitness(Dimension),
+	Select = rank_select(80),
+	% Reproduce = grow_population(Dimension, 4),
+	Reproduce = random_npoint_crossover(80, 1),
+	Mutate = population_hillclimber(xor_mutant(Dimension)),
+	Terminate = terminate(Dimension),
 
-	% Mutations stack: at 0.1, each solution has a 10% chance to mutate once,
-	% a 1% chance to mutate twice, a 0.1% chance to mutate 3 times, etc.
-	MutationRate = 0.1,
+	random_population(Dimension, PopulationSize, InitialPopulation),
+	genetic_search(InitialPopulation, Fitness, Select, Reproduce, Mutate, Terminate, _),
 
-	genetic:long_snake(Dimension, 1, SelectionBias, SurvivalRate, MutationRate, _).
+	halt.

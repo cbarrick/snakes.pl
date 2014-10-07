@@ -8,7 +8,12 @@
 	reachable/3,    % reachable(+Dimension, +Snake, ?Node)
 	snake/2,        % snake(+Dimension, ?Snake)
 	skin_density/4, % skin_density(+Dimension, +Path, +Node, -Density)
-	prune/3         % prune(+Dimension, +Path, -Snake)
+	prune/3,        % prune(+Dimension, +Path, -Snake)
+	fitness/3,      % fitness(+Dimension, +Transitions, -Fitness)
+	random_paths/3, % random_paths(+Transitions, +N, -Paths)
+	mutant/3,       % mutant(+Dimension, ?Transitions, ?Mutant)
+	cleanup/0,      % cleanup
+	cleanup_auto/1  % cleanup_auto(+Freq)
 
 ]).
 
@@ -143,9 +148,80 @@ prune(Dimension, Path, Snake) :-
 	prune(Dimension, T, Snake).
 
 
-%% cleanup
+%% fitness(+Dimension, +Transitions, -Fitness)
+% Calculate the Fitness score for a list of Transitions describing a path
+% in the hypercube of the given Dimension.
+
+:- dynamic(fitness_memo/3).
+
+fitness(Dimension, Transitions, Fitness) :-
+	fitness_memo(Dimension, Transitions, Fitness),
+	!.
+
+fitness(Dimension, Transitions, Fitness) :-
+	transitions(Path, Transitions),
+	prune(Dimension, Path, Snake),
+	length(Snake, Length),
+	findall(D, (node(Dimension, Node), skin_density(Dimension, Snake, Node, D)), Densities),
+	sum_list(Densities, Density),
+	Fitness is Length * Length + Density,
+	asserta(fitness_memo(Dimension, Transitions, Fitness)).
+
+
+%% random_paths(+Dimension, +N, -ListOfTransitions)
+% Generate a list of N random paths as transition-lists for the hypercube of
+% the given Dimension.
+
+random_paths(Dimension, N, ListOfTransitions) :-
+	length(ListOfTransitions, N),
+	Length is ceiling(0.4 * (2 ^ Dimension)),
+	findall(X, (
+		member(X, ListOfTransitions),
+		length(X, Length)
+	), ListOfTransitions),
+	random_paths_(Dimension, N, ListOfTransitions).
+
+random_paths_(_, 0, []) :- !.
+
+random_paths_(Dimension, N, [[]|ListOfTransitions]) :-
+	N0 is N-1,
+	!,
+	random_paths_(Dimension, N0, ListOfTransitions).
+
+random_paths_(Dimension, N, [[H|T]|ListOfTransitions]) :-
+	D0 is Dimension - 1,
+	random_between(0, D0, H),
+	!,
+	random_paths_(Dimension, N, [T|ListOfTransitions]).
+
+
+%% mutant(+Dimension, ?Transitions, ?Mutant)
+% True when Mutant is a single-point mutation of Transitions
+
+mutant(Dimension, Transitions, Mutant) :-
+	length(Transitions, L),
+	between(0, L, MutationPoint),
+	length(Front, MutationPoint),
+	append([Front, [X], Back], Transitions),
+	D0 is Dimension-1,
+	between(0, D0, Y),
+	X \= Y,
+	append([Front, [Y], Back], Mutant).
+
+
+%% cleanup / cleanup_auto(Freq)
 % Cleans memos left by this module. This predicate is not explicitly exported.
 % To call it, you must provide the module, i.e. `?- graph:cleanup.`
 
 cleanup :-
-	retractall(graph:snake_memo(_,_)).
+	retractall(graph:snake_memo(_,_)),
+	retractall(graph:fitness_memo(_,_,_)).
+
+cleanup_auto(Freq) :-
+	flag(graph:last_cleanup, N, N+1),
+	(N >= Freq ->
+		cleanup,
+		flag(graph:last_cleanup, _, 0)
+	;
+		true
+	).

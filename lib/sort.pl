@@ -90,24 +90,30 @@ mergesort_(List, Comparator, Sorted) :-
 	length(Front, Half),
 	append(Front, Back, List),
 
-	thread_create(
-		(
-			mergesort_(Front, Comparator, SortedFront),
-			thread_exit(SortedFront)
+	(debugging(mergesort) ->
+		% When debugging mergesort, dissable multithreading
+		mergesort_(Front, Comparator, SortedFront),
+		mergesort_(Back, Comparator, SortedBack)
+	;
+		thread_create(
+			(
+				mergesort_(Front, Comparator, SortedFront),
+				thread_exit(SortedFront)
+			),
+			FrontThread,
+			[]
 		),
-		FrontThread,
-		[]
-	),
-	thread_create(
-		(
-			mergesort_(Back, Comparator, SortedBack),
-			thread_exit(SortedBack)
+		thread_create(
+			(
+				mergesort_(Back, Comparator, SortedBack),
+				thread_exit(SortedBack)
+			),
+			BackThread,
+			[]
 		),
-		BackThread,
-		[]
+		thread_join(FrontThread, exited(SortedFront)),
+		thread_join(BackThread, exited(SortedBack))
 	),
-	thread_join(FrontThread, exited(SortedFront)),
-	thread_join(BackThread, exited(SortedBack)),
 
 	merge(SortedFront, SortedBack, Comparator, Sorted).
 
